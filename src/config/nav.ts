@@ -9,6 +9,7 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/game', label: 'Play Game' },
+  { href: '/history', label: 'Game History' },
   { href: '/users', label: 'Users', roles: ['ADMIN'] },
 ];
 
