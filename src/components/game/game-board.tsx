@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,17 @@ import {
 type GameMode = 'human_vs_human' | 'human_vs_computer';
 type CellValue = 'X' | 'O' | null;
 
+interface GameHistoryItem {
+  id: string;
+  gameMode: GameMode;
+  boardSize: number;
+  winCondition: number;
+  winner: 'X' | 'O' | 'Draw';
+  createdAt: string;
+}
+
+const LOCAL_STORAGE_KEY = 'dynamic_tic_tac_toe_state_v1';
+
 export function GameBoard() {
   const [gameMode, setGameMode] = useState<GameMode>('human_vs_human');
   const [boardSize, setBoardSize] = useState<number>(3);
@@ -36,8 +47,74 @@ export function GameBoard() {
   const [activePlayer, setActivePlayer] = useState<'X' | 'O'>('X');
   const [winner, setWinner] = useState<'X' | 'O' | 'Draw' | null>(null);
   const [scores, setScores] = useState({ X: 0, O: 0, Draws: 0 });
+  const [history, setHistory] = useState<GameHistoryItem[]>([]);
   const [gameOverModal, setGameOverModal] = useState<boolean>(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.gameMode) setGameMode(parsed.gameMode);
+        if (parsed.boardSize) setBoardSize(parsed.boardSize);
+        if (parsed.winCondition) setWinCondition(parsed.winCondition);
+        if (typeof parsed.isStarted === 'boolean') setIsStarted(parsed.isStarted);
+        if (Array.isArray(parsed.board)) setBoard(parsed.board);
+        if (parsed.activePlayer) setActivePlayer(parsed.activePlayer);
+        if (parsed.winner !== undefined) setWinner(parsed.winner);
+        if (parsed.scores) setScores(parsed.scores);
+        if (Array.isArray(parsed.history)) setHistory(parsed.history);
+      }
+    } catch (e) {
+      console.error('Failed to load state from localStorage', e);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      const stateToSave = {
+        gameMode,
+        boardSize,
+        winCondition,
+        isStarted,
+        board,
+        activePlayer,
+        winner,
+        scores,
+        history,
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (e) {
+      console.error('Failed to save state to localStorage', e);
+    }
+  }, [
+    gameMode,
+    boardSize,
+    winCondition,
+    isStarted,
+    board,
+    activePlayer,
+    winner,
+    scores,
+    history,
+    isLoaded,
+  ]);
+
+  const recordFinishedGame = (res: 'X' | 'O' | 'Draw') => {
+    const newItem: GameHistoryItem = {
+      id: Date.now().toString(),
+      gameMode,
+      boardSize,
+      winCondition,
+      winner: res,
+      createdAt: new Date().toISOString(),
+    };
+    setHistory((prev) => [newItem, ...prev]);
+  };
 
   const handleStartGame = () => {
     if (winCondition > boardSize) {
@@ -58,7 +135,6 @@ export function GameBoard() {
     size: number,
     winLen: number,
   ): 'X' | 'O' | 'Draw' | null => {
-    // Check rows
     for (let r = 0; r < size; r++) {
       for (let c = 0; c <= size - winLen; c++) {
         const first = currentBoard[r * size + c];
@@ -74,7 +150,6 @@ export function GameBoard() {
       }
     }
 
-    // Check columns
     for (let c = 0; c < size; c++) {
       for (let r = 0; r <= size - winLen; r++) {
         const first = currentBoard[r * size + c];
@@ -90,7 +165,6 @@ export function GameBoard() {
       }
     }
 
-    // Check diagonals (top-left to bottom-right)
     for (let r = 0; r <= size - winLen; r++) {
       for (let c = 0; c <= size - winLen; c++) {
         const first = currentBoard[r * size + c];
@@ -106,7 +180,6 @@ export function GameBoard() {
       }
     }
 
-    // Check diagonals (top-right to bottom-left)
     for (let r = 0; r <= size - winLen; r++) {
       for (let c = winLen - 1; c < size; c++) {
         const first = currentBoard[r * size + c];
@@ -150,6 +223,7 @@ export function GameBoard() {
       if (res === 'X') setScores((s) => ({ ...s, X: s.X + 1 }));
       else if (res === 'O') setScores((s) => ({ ...s, O: s.O + 1 }));
       else setScores((s) => ({ ...s, Draws: s.Draws + 1 }));
+      recordFinishedGame(res);
     } else {
       setActivePlayer(currentActive === 'X' ? 'O' : 'X');
     }
@@ -169,6 +243,7 @@ export function GameBoard() {
       if (res === 'X') setScores((s) => ({ ...s, X: s.X + 1 }));
       else if (res === 'O') setScores((s) => ({ ...s, O: s.O + 1 }));
       else setScores((s) => ({ ...s, Draws: s.Draws + 1 }));
+      recordFinishedGame(res);
       return;
     }
 
@@ -184,10 +259,12 @@ export function GameBoard() {
 
   const handleResetScores = () => {
     setScores({ X: 0, O: 0, Draws: 0 });
+    setHistory([]);
     setIsStarted(false);
     setBoard([]);
     setWinner(null);
-    toast('Scores and game reset.');
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    toast('Scores, history and game reset.');
   };
 
   return (
