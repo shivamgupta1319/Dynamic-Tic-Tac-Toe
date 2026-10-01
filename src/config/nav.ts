@@ -13,4 +13,4 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/users', label: 'Users', roles: ['ADMIN'] },
 ];
 
-export const APP_NAME = 'App';
+export const APP_NAME = 'Dynamic Tic Tac Toe';
